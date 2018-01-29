@@ -2572,6 +2572,98 @@ function WebGLRenderer( parameters ) {
 
 	};
 
+	var partialScene = null, partialCamera = null;
+
+	this.partialRenderStart = function ( scene, camera ) {
+
+		partialScene = scene;
+		partialCamera = camera;
+
+		// reset caching for this frame
+
+		_currentGeometryProgram = '';
+		_currentMaterialId = - 1;
+		_currentCamera = null;
+
+		// update scene graph
+
+		if ( scene.autoUpdate === true ) scene.updateMatrixWorld();
+
+		// update camera matrices and frustum
+
+		if ( camera.parent === null ) camera.updateMatrixWorld();
+
+		scene.onBeforeRender( _this, scene, camera, null );
+
+		_projScreenMatrix.multiplyMatrices( camera.projectionMatrix, camera.matrixWorldInverse );
+		_frustum.setFromMatrix( _projScreenMatrix );
+
+		lightsArray.length = 0;
+		shadowsArray.length = 0;
+
+		spritesArray.length = 0;
+
+		_localClippingEnabled = this.localClippingEnabled;
+		_clippingEnabled = _clipping.init( this.clippingPlanes, _localClippingEnabled, camera );
+
+		currentRenderList = renderLists.get( scene, camera );
+		currentRenderList.init();
+
+		projectObject( scene, camera, _this.sortObjects );
+
+		if ( _this.sortObjects === true ) {
+
+			currentRenderList.sort();
+
+		}
+
+		//
+
+		if ( _clippingEnabled ) _clipping.beginShadows();
+
+		shadowMap.render( shadowsArray, scene, camera );
+
+		lights.setup( lightsArray, shadowsArray, camera );
+
+		if ( _clippingEnabled ) _clipping.endShadows();
+
+		//
+
+		if ( this.info.autoReset ) this.info.reset();
+
+		this.setRenderTarget( null );
+
+	};
+
+	this.partialRenderObjects = function ( objects ) {
+
+		var camera = partialCamera;
+		var scene = partialScene;
+
+		_currentGeometryProgram = '';
+		_currentMaterialId = - 1;
+		_currentCamera = null;
+
+		renderObjects( objects, scene, camera );
+
+	};
+
+	this.partialRenderFinish = function () {
+
+		var camera = partialCamera;
+		var scene = partialScene;
+
+		state.buffers.depth.setTest( true );
+		state.buffers.depth.setMask( true );
+		state.buffers.color.setMask( true );
+
+		state.setPolygonOffset( false );
+
+		scene.onAfterRender( _this, scene, camera );
+
+		currentRenderList = null;
+	};
+
 }
 
 
